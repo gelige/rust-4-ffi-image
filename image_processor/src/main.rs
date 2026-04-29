@@ -1,12 +1,14 @@
+mod plugin_loader;
+mod utils;
+
 use anyhow::{Context, bail};
 use clap::Parser;
 use image::{ImageError, RgbaImage};
-use libloading::Library;
-use std::ffi::{CString, c_char};
+use plugin_loader::Plugin;
+use std::ffi::CString;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
-
-type ProcessImage = unsafe extern "C" fn(u32, u32, *mut u8, *const c_char);
+use utils::ensure_existing_file;
 
 #[derive(Parser)]
 #[command(name = "image-processor", about = "Apply an image processing plugin")]
@@ -35,8 +37,10 @@ struct Cli {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    // Validate the input file
     ensure_existing_file(&cli.input, "Input file")?;
 
+    // Read the params file if provided, otherwise use an empty JSON object
     let params = if let Some(params) = cli.params {
         ensure_existing_file(&params, "Params file")?;
         read_to_string(&params)
@@ -48,6 +52,7 @@ fn main() -> anyhow::Result<()> {
     // Convert the params string to a CString to pass to the plugin
     let params = CString::new(params).context("Params contain an interior null byte")?;
 
+    // Load the image
     let mut image = load_rgba_image(&cli.input)?;
     let (width, height) = image.dimensions();
     let expected_len = rgba_buffer_len(width, height)?;
@@ -59,39 +64,17 @@ fn main() -> anyhow::Result<()> {
         );
     }
 
-    // Load the plugin library
-    let plugin_file = plugin_library_path(&cli.plugin_path, &cli.plugin);
-    ensure_existing_file(&plugin_file, "Plugin library")?;
+    // Load the plugin
+    let plugin = Plugin::load(&cli.plugin_path, &cli.plugin)?;
 
     // SAFETY: plugin API requires `process_image` to match `ProcessImage`.
     // The image buffer and params CString are kept alive and are not moved or
     // freed until `process_image` returns.
     unsafe {
-        let library = Library::new(&plugin_file)
-            .with_context(|| format!("Failed to load plugin: {}", plugin_file.display()))?;
-
-        let process_image: libloading::Symbol<ProcessImage> =
-            library.get(b"process_image").with_context(|| {
-                format!(
-                    "Plugin has no process_image symbol: {}",
-                    plugin_file.display()
-                )
-            })?;
-
-        process_image(width, height, image.as_mut_ptr(), params.as_ptr());
+        plugin.process_image(width, height, image.as_mut_ptr(), params.as_ptr())?;
     }
 
     save_rgba_image(cli.output, width, height, image.into_raw())
-}
-
-fn ensure_existing_file(path: &Path, label: &str) -> anyhow::Result<()> {
-    if !path.exists() {
-        bail!("{} does not exist: {}", label, path.display());
-    }
-    if !path.is_file() {
-        bail!("{} is not a regular file: {}", label, path.display());
-    }
-    Ok(())
 }
 
 fn load_rgba_image(input: &Path) -> anyhow::Result<RgbaImage> {
@@ -116,15 +99,6 @@ fn rgba_buffer_len(width: u32, height: u32) -> anyhow::Result<usize> {
         .checked_mul(height as usize)
         .and_then(|pixels| pixels.checked_mul(4))
         .context("Image dimensions are too large")
-}
-
-fn plugin_library_path(plugin_path: &Path, plugin: &str) -> PathBuf {
-    plugin_path.join(format!(
-        "{}{}{}",
-        std::env::consts::DLL_PREFIX,
-        plugin,
-        std::env::consts::DLL_SUFFIX
-    ))
 }
 
 fn save_rgba_image(output: PathBuf, width: u32, height: u32, data: Vec<u8>) -> anyhow::Result<()> {
