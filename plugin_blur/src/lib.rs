@@ -19,7 +19,8 @@ pub extern "C" fn process_image(
         return;
     }
 
-    // SAFETY: we know that the params are valid UTF-8
+    // SAFETY: `params` was checked for null and must point to a
+    // null-terminated string for the duration of this call.
     let params_str = unsafe {
         match CStr::from_ptr(params).to_str() {
             Ok(s) => s,
@@ -44,7 +45,8 @@ pub extern "C" fn process_image(
     let row_size = w * BYTES_PER_PIXEL;
     let len = row_size * h;
 
-    // SAFETY: we know that the data is valid and we have the correct length
+    // SAFETY: `rgba_data` was checked for null. The host guarantees that it
+    // points to a writable RGBA buffer of `len` bytes for this call.
     let data = unsafe { from_raw_parts_mut(rgba_data, len) };
 
     blur_image(data, w, h, radius, iterations);
