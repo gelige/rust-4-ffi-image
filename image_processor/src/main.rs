@@ -4,6 +4,7 @@ mod utils;
 use anyhow::{Context, bail};
 use clap::Parser;
 use image::{ImageError, RgbaImage};
+use log::{info, warn};
 use plugin_loader::Plugin;
 use std::ffi::CString;
 use std::fs::read_to_string;
@@ -35,6 +36,8 @@ struct Cli {
 }
 
 fn main() -> anyhow::Result<()> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     let cli = Cli::parse();
 
     // Validate the input file
@@ -46,7 +49,7 @@ fn main() -> anyhow::Result<()> {
         read_to_string(&params)
             .with_context(|| format!("Failed to read params file: {}", params.display()))?
     } else {
-        eprintln!("Warning: no --params file provided. The image may remain unchanged.");
+        warn!("No --params file provided. The image may remain unchanged.");
         "{}".to_string()
     };
 
@@ -54,8 +57,11 @@ fn main() -> anyhow::Result<()> {
     let params = CString::new(params).context("Params contain an interior null byte")?;
 
     // Load the image
+    info!("Loading image from {}", cli.input.display());
     let mut image = load_rgba_image(&cli.input)?;
     let (width, height) = image.dimensions();
+    info!("Loaded image: {}x{} pixels", width, height);
+
     let expected_len = rgba_buffer_len(width, height)?;
     if image.as_raw().len() != expected_len {
         bail!(
@@ -66,16 +72,28 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Load the plugin
+    info!(
+        "Loading plugin '{}' from {}",
+        cli.plugin,
+        cli.plugin_path.display()
+    );
     let plugin = Plugin::load(&cli.plugin_path, &cli.plugin)?;
+    info!("Plugin loaded successfully");
 
     // SAFETY: plugin API requires `process_image` to match `ProcessImage`.
     // The image buffer and params CString are kept alive and are not moved or
     // freed until `process_image` returns.
+    info!("Applying plugin '{}'", cli.plugin);
     unsafe {
         plugin.process_image(width, height, image.as_mut_ptr(), params.as_ptr())?;
     }
+    info!("Plugin applied successfully");
 
-    save_rgba_image(cli.output, width, height, image.into_raw())
+    let output = cli.output;
+    save_rgba_image(output.clone(), width, height, image.into_raw())?;
+    info!("Image saved successfully to {}", output.display());
+
+    Ok(())
 }
 
 fn load_rgba_image(input: &Path) -> anyhow::Result<RgbaImage> {
