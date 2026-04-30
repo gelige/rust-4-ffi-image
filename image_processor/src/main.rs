@@ -46,6 +46,7 @@ fn main() -> anyhow::Result<()> {
         read_to_string(&params)
             .with_context(|| format!("Failed to read params file: {}", params.display()))?
     } else {
+        eprintln!("Warning: no --params file provided. The image may remain unchanged.");
         "{}".to_string()
     };
 
