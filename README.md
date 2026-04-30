@@ -58,7 +58,7 @@ cargo build -p plugin_blur
 
 ```bash
 cargo run -p image_processor -- \
-  --input input.png \
+  --input input-sample.png \
   --output output.png \
   --plugin plugin_mirror \
   --plugin-path target/debug \
@@ -76,7 +76,7 @@ cargo run -p image_processor -- \
 
 ```bash
 cargo run -p image_processor -- \
-  --input input.png \
+  --input input-sample.png \
   --output output.png \
   --plugin plugin_blur \
   --plugin-path target/debug \
