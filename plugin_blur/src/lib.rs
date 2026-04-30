@@ -107,3 +107,84 @@ fn blur_image(data: &mut [u8], width: usize, height: usize, radius: u64, iterati
 fn pixel_offset(x: usize, y: usize, width: usize) -> usize {
     (y * width + x) * BYTES_PER_PIXEL
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    #[test]
+    fn blurs_image_with_one_iteration() {
+        let mut data = vec![
+            0, 10, 20, 30, //
+            40, 50, 60, 70, //
+            120, 130, 140, 150, //
+            200, 210, 220, 230, //
+            240, 250, 100, 110,
+        ];
+        let params = CString::new(r#"{"radius":1,"iterations":1}"#).unwrap();
+
+        process_image(5, 1, data.as_mut_ptr(), params.as_ptr());
+
+        assert_eq!(
+            data,
+            vec![
+                40, 50, 60, 70, //
+                60, 70, 80, 90, //
+                120, 130, 140, 150, //
+                180, 190, 120, 130, //
+                200, 210, 220, 230,
+            ]
+        );
+    }
+
+    #[test]
+    fn blurs_image_with_radius_two_and_one_iteration() {
+        let mut data = vec![
+            0, 10, 20, 30, //
+            40, 50, 60, 70, //
+            120, 130, 140, 150, //
+            200, 210, 220, 230, //
+            240, 250, 100, 110,
+        ];
+        let params = CString::new(r#"{"radius":2,"iterations":1}"#).unwrap();
+
+        process_image(5, 1, data.as_mut_ptr(), params.as_ptr());
+
+        assert_eq!(
+            data,
+            vec![
+                93, 103, 113, 123, //
+                130, 140, 150, 160, //
+                120, 130, 87, 97, //
+                110, 120, 90, 100, //
+                147, 157, 167, 177,
+            ]
+        );
+    }
+
+    #[test]
+    fn blurs_image_with_two_iterations() {
+        let mut data = vec![
+            0, 10, 20, 30, //
+            40, 50, 60, 70, //
+            120, 130, 140, 150, //
+            200, 210, 220, 230, //
+            240, 250, 100, 110,
+        ];
+        let params = CString::new(r#"{"radius":1,"iterations":2}"#).unwrap();
+
+        process_image(5, 1, data.as_mut_ptr(), params.as_ptr());
+
+        assert_eq!(
+            data,
+            vec![
+                60, 70, 80, 90, //
+                80, 90, 100, 110, //
+                120, 130, 100, 110, //
+                160, 170, 180, 190, //
+                180, 190, 120, 130,
+            ]
+        );
+    }
+}

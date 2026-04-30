@@ -45,6 +45,17 @@ cargo build -p plugin_blur
 - macOS: `libplugin_mirror.dylib`, `libplugin_blur.dylib`
 - Windows: `plugin_mirror.dll`, `plugin_blur.dll`
 
+## Тесты
+
+Запустить все тесты workspace:
+
+```bash
+cargo test
+```
+
+Тесты проверяют основную логику плагинов: горизонтальное и вертикальное отражение в `plugin_mirror`, а также размытие
+с разным радиусом и количеством итераций в `plugin_blur`.
+
 ## Запуск
 
 Пример параметров для `plugin_mirror`, файл `mirror.json`:

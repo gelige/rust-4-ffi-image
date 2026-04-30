@@ -92,3 +92,47 @@ fn swap_pixels(data: &mut [u8], left: usize, right: usize) {
 
     left_pixel.swap_with_slice(right_pixel);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    #[test]
+    fn mirrors_image_horizontally() {
+        let mut data = vec![
+            1, 11, 21, 31, 2, 12, 22, 32, //
+            3, 13, 23, 33, 4, 14, 24, 34,
+        ];
+        let params = CString::new(r#"{"horizontal":true,"vertical":false}"#).unwrap();
+
+        process_image(2, 2, data.as_mut_ptr(), params.as_ptr());
+
+        assert_eq!(
+            data,
+            vec![
+                2, 12, 22, 32, 1, 11, 21, 31, //
+                4, 14, 24, 34, 3, 13, 23, 33,
+            ]
+        );
+    }
+
+    #[test]
+    fn mirrors_image_vertically() {
+        let mut data = vec![
+            1, 11, 21, 31, 2, 12, 22, 32, //
+            3, 13, 23, 33, 4, 14, 24, 34,
+        ];
+        let params = CString::new(r#"{"horizontal":false,"vertical":true}"#).unwrap();
+
+        process_image(2, 2, data.as_mut_ptr(), params.as_ptr());
+
+        assert_eq!(
+            data,
+            vec![
+                3, 13, 23, 33, 4, 14, 24, 34, //
+                1, 11, 21, 31, 2, 12, 22, 32,
+            ]
+        );
+    }
+}
